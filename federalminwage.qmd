@@ -1,0 +1,202 @@
+---
+title: "Federal minimum wage"
+author: "Hans Henrik Sievertsen"
+format: html
+editor: visual
+---
+
+Sources
+
+-   <https://www.dol.gov/agencies/whd/minimum-wage/history/chart>
+
+-   <https://data.bls.gov/dataViewer/view/timeseries/CUUR0000SA0;jsessionid=A4AC446598FD5DD972BF80243F62D874>
+
+```{r}
+if (!requireNamespace("remotes", quietly = TRUE)) {
+    install.packages("remotes")
+}
+remotes::install_github("ropensci/tabulizer")
+```
+
+```{r}
+library("tabulapdf")
+
+tables <- extract_tables("federal minimum wage US.pdf")
+```
+
+clean dates
+
+```{r}
+library(data.table)
+date<-as.data.table(tables[[1]][3:28,1])
+# Remove any extra whitespace
+date[, dates := trimws(`...1`)]
+
+# Fix five-digit years (remove the last digit)
+date[, dates := gsub("(\\d{4})\\d", "\\1", dates)]
+date[, dates := gsub("\\.", "", dates)]
+date[, dates := gsub("SEPT", "SEP", dates)]
+date[, proper_date := as.Date(dates, format = "%b %d, %Y")]
+
+# Add post 2007
+date_add <- as.data.table(rbind(names(tables[[2]][,1]), tables[[2]][,1]))
+names(date_add) <- "date"
+date_add[, dates := trimws(date)]
+date_add[, dates := gsub("(\\d{4})\\d", "\\1", dates)]
+date_add[, dates := gsub("\\.", "", dates)]
+date_add[, date := as.Date(dates, format = "%b %d, %Y")]
+
+```
+
+CPI adjustment
+
+```{r}
+cpi<-as.data.table(read.csv("cpi.csv"))
+cpi[, month := as.integer(substr(Period,2,3))]
+cpi[, year := as.integer(Year)]
+
+
+
+```
+
+clean 1938 act
+
+```{r}
+library(zoo)
+mw38<-as.data.table(tables[[1]][3:28,2])
+mw38[, wage := as.numeric(gsub("\\$", "", `...2`))]
+mw38[, wage38 := zoo::na.locf(wage, na.rm = FALSE)]
+mw38<-data.table(
+  date=date$proper_date,
+  mw38=mw38$wage38
+)
+mw38[, year := as.integer(format(date, "%Y"))]
+mw38[, month := as.integer(format(date, "%m"))]
+mw38<-merge(mw38 ,cpi,by=c("month","year"),all.y = TRUE)
+setorder(mw38,  year, month)
+mw38[, mw38 := zoo::na.locf(mw38, na.rm = FALSE)]
+mw38[, mw38 := mw38*308.417/Value]
+mw38 <- mw38[, .(year, month, mw38)]
+mw38[is.na(mw38), mw38 := 0]
+
+
+
+```
+
+clean 1961 amendment
+
+```{r}
+mw61<-as.data.table(tables[[1]][3:28,3])
+mw61[, wage := gsub("[^0-9.]", "", `...3`)]
+mw61[, wage := as.numeric(gsub("\\$", "", wage))]
+
+# Add post 2007
+mw61_add <- as.data.table(rbind(names(tables[[2]][,2]), tables[[2]][,2]))
+names(mw61_add) <- "wage"
+mw61_add[, wage := gsub("[^0-9.]", "", wage)]
+mw61_add[, wage := as.numeric(gsub("\\$", "", wage))]
+
+mw61<-data.table(
+  date=date$proper_date,
+  mw61=mw61$wage
+)
+mw61add<-data.table(
+  date=date_add$date,
+  mw61=mw61_add$wage
+)
+mw61<-rbind(mw61,mw61add)
+
+mw61[, year := as.integer(format(date, "%Y"))]
+mw61[, month := as.integer(format(date, "%m"))]
+mw61<-merge(mw61 ,cpi,by=c("month","year"),all.y = TRUE)
+setorder(mw61,  year, month)
+mw61[, mw61 := zoo::na.locf(mw61, na.rm = FALSE)]
+mw61[, mw61 := mw61*308.417/Value]
+mw61 <- mw61[, .(year, month, mw61)]
+mw61[is.na(mw61), mw61 := 0]
+
+
+
+```
+
+clean 1966 amendment
+
+```{r}
+
+mw66<-as.data.table(tables[[1]][3:28,4])
+mw66[, c("nonfarm", "farm") := tstrsplit(`1966 & SUBSEQUENT AMENDMENTS3`, " ")]
+
+mw66[, wage67nf := gsub("[^0-9.]", "", `nonfarm`)]
+mw66[, wage67nf := as.numeric(gsub("\\$", "", wage67nf))]
+mw66[, wage67nf := zoo::na.locf(wage67nf, na.rm = FALSE)]
+mw66[, wage67f := gsub("[^0-9.]", "", `farm`)]
+mw66[, wage67f := as.numeric(gsub("\\$", "", wage67f))]
+mw66[, wage67f := zoo::na.locf(wage67f, na.rm = FALSE)]
+
+mw66f<-data.table(
+  date=date$proper_date,
+  mw66f=mw66$wage67f
+)
+mw66f[, year := as.integer(format(date, "%Y"))]
+mw66f[, month := as.integer(format(date, "%m"))]
+mw66f<-merge(mw66f ,cpi,by=c("month","year"),all.y = TRUE)
+setorder(mw66f,  year, month)
+mw66f[, mw66f := zoo::na.locf(mw66f, na.rm = FALSE)]
+mw66f[, mw66f := mw66f*308.417/Value]
+mw66f <- mw66f[, .(year, month, mw66f)]
+mw66f[is.na(mw66f), mw66f := 0]
+
+
+
+mw66nf<-data.table(
+  date=date$proper_date,
+  mw66nf=mw66$wage67nf
+)
+mw66nf[, year := as.integer(format(date, "%Y"))]
+mw66nf[, month := as.integer(format(date, "%m"))]
+mw66nf<-merge(mw66nf ,cpi,by=c("month","year"),all.y = TRUE)
+setorder(mw66nf,  year, month)
+mw66nf[, mw66nf := zoo::na.locf(mw66nf, na.rm = FALSE)]
+mw66nf[, mw66nf := mw66nf*308.417/Value]
+mw66nf <- mw66nf[, .(year, month, mw66nf)]
+mw66nf[is.na(mw66nf), mw66nf := 0]
+
+```
+
+combine
+
+```{r}
+library(lubridate)
+mw<-data.table(
+  year=mw38$year,
+  month=mw38$month,
+  `Federal Min. Wage`=mw38$mw38,
+  `1961 FLSA`=mw61$mw61,
+  `1966 FLSA agriculture`=mw66f$mw66f,
+  `1966 FLSA`=mw66nf$mw66nf
+)
+mw[year>1977, c("Federal Min. Wage", "1966 FLSA agriculture", "1966 FLSA") := .(`1961 FLSA`, `1961 FLSA`, `1961 FLSA`)]
+mw[, date := as.Date(paste(year, month, "01", sep = "-"))]
+mw <- mw[(year > 1938) | (year == 1938 & month >= 10)]
+mw <- mw[, .(date, `Federal Min. Wage`, `1966 FLSA agriculture`, `1966 FLSA`,`1961 FLSA`)]
+mwdata <- melt(mw, id.vars = "date", variable.name = "category", value.name = "mw")
+
+
+```
+
+Price graph
+
+```{r}
+library(ggplot2)
+
+ggplot(mwdata,aes(x=date,linetype=category,y=mw,linewidth=category))+geom_line()+
+  labs(linetype="",x=" ",y=" ", title="US Federal Minimum Wage")+
+  theme_minimal()+
+  theme(legend.position = "bottom")+
+  scale_y_continuous(labels = scales::dollar_format())+
+  scale_linewidth_manual("type", values = c(0.9,0.4,0.9,0.1), guide = "none")+
+  annotate("text", x =  as.Date("1930-01-01"), y = 12, label = "Manufacturing, ransport,\nCommunication, Wholesale,\nFinance, Real estate,\nMining, Forestry, Fishing",hjust=0,size=3)+
+  annotate("text", x =  as.Date("1970-01-01"), y = 3, label = "Restaurants, Schools, Hospitals,\nNursing homes, Hotels, Laundries,\nEntertainment & recr. serv., Agriculture",hjust=0,size=3)+
+  theme(plot.title = element_text(hjust=0.5,size=20))
+ggsave("fig_min_wage.png",bg="white")
+```
