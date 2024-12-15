@@ -190,13 +190,18 @@ Price graph
 library(ggplot2)
 
 ggplot(mwdata,aes(x=date,linetype=category,y=mw,linewidth=category))+geom_line()+
-  labs(linetype="",x=" ",y=" ", title="US Federal Minimum Wage")+
+  labs(linetype="",x=" ",y=" ",title="US min.\n  wage ",caption="Source: U.S. Department of Labor")+
   theme_minimal()+
   theme(legend.position = "bottom")+
   scale_y_continuous(labels = scales::dollar_format())+
-  scale_linewidth_manual("type", values = c(0.9,0.4,0.9,0.1), guide = "none")+
+  scale_linewidth_manual("type", values = c(1.2,0.4,0.8,0.1), guide = "none")+
   annotate("text", x =  as.Date("1930-01-01"), y = 12, label = "Manufacturing, ransport,\nCommunication, Wholesale,\nFinance, Real estate,\nMining, Forestry, Fishing",hjust=0,size=3)+
-  annotate("text", x =  as.Date("1970-01-01"), y = 3, label = "Restaurants, Schools, Hospitals,\nNursing homes, Hotels, Laundries,\nEntertainment & recr. serv., Agriculture",hjust=0,size=3)+
-  theme(plot.title = element_text(hjust=0.5,size=20))
-ggsave("fig_min_wage.png",bg="white")
+  annotate("text", x =  as.Date("1970-01-01"), y = 3, label = "Restaurants, Schools, Hospitals,\nNursing homes, Hotels, Laundries,\nEntertainment & recr. serv., Agriculture",hjust=0,size=3) +
+    theme(
+    plot.title = element_text(hjust = -0.08, size = 10, color = "grey30"),
+    plot.margin = rep(grid::unit(0.15, "in"), 4),
+    axis.title = element_text(hjust = 0.5, size = 11, color = "grey30"),
+    plot.caption =  element_text(hjust = 0, size = 8, color = "grey30"),
+  )
+ggsave("fig_min_wage.png",bg="white", width = 8, height = 6)
 ```

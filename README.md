@@ -1,3 +1,2 @@
 # US_federal_min_wage
- 
-![](fig_min_wage.png)
+<img src="fig_min_wage.png" alt="Minimum Wage Plot" width="400">
